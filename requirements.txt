@@ -1,1 +1,114 @@
-npm 
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "secretsmanager:GetSecretValue",
+        "secretsmanager:DescribeSecret"
+      ],
+      "Resource": "arn:aws:secretsmanager:region:account-id:secret:my-secret-name"
+    }
+  ]
+}
+
+
+
+
+kubectl apply -f https://raw.githubusercontent.com/external-secrets/external-secrets/main/deploy/crds/external-secrets.v1beta1.externalsecrets.k8s.io.yaml
+kubectl apply -f https://raw.githubusercontent.com/external-secrets/external-secrets/main/deploy/install.yaml
+
+
+
+apiVersion: external-secrets.io/v1beta1
+kind: SecretStore
+metadata:
+  name: aws-secret-store
+  namespace: default
+spec:
+  provider:
+    aws:
+      service: SecretsManager
+      region: us-west-2
+      auth:
+        jwt:
+          serviceAccountRef:
+            name: my-app-service-account
+            namespace: default
+
+
+
+
+
+
+
+
+
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: my-external-secret
+  namespace: default
+spec:
+  refreshInterval: "1m"  # How often to check for changes
+  secretStoreRef:
+    name: aws-secret-store
+    kind: SecretStore
+  target:
+    name: my-kubernetes-secret
+  data:
+    - secretKey: my-kubernetes-secret-key
+      remoteRef:
+        key: my-secret-name
+
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: my-app
+spec:
+  serviceAccountName: my-app-service-account
+  containers:
+    - name: my-app-container
+      image: my-app-image
+      env:
+        - name: MY_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: my-kubernetes-secret
+              key: my-kubernetes-secret-key
+
+
+
+
+
+
+
+
+
+=========================================================================================
+
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: secret-test-app
+spec:
+  serviceAccountName: my-app-service-account
+  containers:
+    - name: secret-test-container
+      image: busybox
+      command: ['sh', '-c', 'while true; do echo -n "$(date) - "; echo $MY_SECRET; sleep 5; done']
+      env:
+        - name: MY_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: my-kubernetes-secret
+              key: my-kubernetes-secret-key
+
+
+
+
+
+
+
